@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Precision Aluminum Block Cost Estimator (EUR)</title>
+    <!-- Tailwind CSS CDN for modern design -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            900: '#0b1329',
+                            800: '#1c2541',
+                            700: '#3a506b',
+                            600: '#5c677d',
+                        },
+                        blue: {
+                            400: '#64dfdf',
+                            500: '#48cae4',
+                            600: '#0077b6',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased pb-12">
+
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                    <span class="text-blue-500">■</span> Precision Aluminum Block Cost Estimator
+                </h1>
+                <p class="text-xs text-slate-400 mt-0.5">Custom configurations with 3-decimal engineering precision</p>
+            </div>
+            
+            <div class="flex flex-wrap items-center gap-2">
+                <button onclick="openGuide()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded border border-slate-700 flex items-center gap-1.5 transition">
+                    💡 Guide
+                </button>
+                <button onclick="saveToLocal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded border border-slate-700 flex items-center gap-1.5 transition">
+                    💾 Save State
+                </button>
+                <button onclick="exportJSON()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1.5 rounded flex items-center gap-1.5 transition">
+                    📤 Export JSON
+                </button>
+                <label class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded border border-slate-700 flex items-center gap-1.5 cursor-pointer transition">
+                    📥 Import JSON
+                    <input type="file" id="import-file" class="hidden" onchange="importJSON(event)">
+                </label>
+            </div>
+        </div>
+    </header>
+
+    <!-- Save State Alert / Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 bg-slate-800 border-l-4 border-blue-500 text-white text-xs px-4 py-3 rounded-lg shadow-2xl transition-all transform translate-y-20 opacity-0 pointer-events-none">
+        Configuration saved successfully.
+    </div>
+
+    <!-- Onboarding / Guide Modal -->
+    <div id="guide-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden px-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-start">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">💡 Quick Guide & Parameter Map</h2>
+                <button onclick="closeGuide()" class="text-slate-400 hover:text-white text-xl">&times;</button>
+            </div>
+            <div class="text-xs text-slate-300 space-y-3 leading-relaxed max-h-96 overflow-y-auto pr-2">
+                <p>Welcome! This application calculates direct manufacturing costs using precise engineering math. Here is where to locate key variables:</p>
+                <div class="bg-slate-900 p-3 rounded border border-slate-700 space-y-2">
+                    <p><strong>🎯 Drilling & Standard Holes:</strong> To adjust hole metrics, look inside <strong>Section 3 (Machining & Cycle Time)</strong>. At the bottom of that section, you can define the total quantity of holes and the average cycle duration (in seconds) per hole.</p>
+                    <p><strong>🛠️ Save & Backup:</strong> Use the buttons in the header to save configurations to your browser cache, or export/import them as <code>.json</code> templates.</p>
+                    <p><strong>⚖️ Material Weighing:</strong> In <strong>Section 1</strong>, toggle "Method" to switch between dimensional volume calculations and a manual weight override.</p>
+                    <p><strong>⚙️ Post-Machining Options:</strong> In <strong>Section 5</strong>, you can add dynamic cleaning, deburring, and surface treatments calculated by weight, run-time, or flat fees.</p>
+                </div>
+                <p class="text-[11px] text-slate-400">Hover over any info <span class="text-blue-400">ⓘ</span> icon across the panel to view descriptions for specific parameters.</p>
+            </div>
+            <div class="text-right">
+                <button onclick="closeGuide()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded font-semibold transition">Got it</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+            
+            <!-- Left Panel (Parameters / Coefficients) -->
+            <div class="lg:col-span-7 space-y-6">
+                
+                <!-- 1. Raw Material -->
+                <section class="bg-slate-800 rounded-xl p-5 border border-slate-700/50 shadow-lg relative">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-sm font-semibold text-blue-400 uppercase tracking-wider flex items-center gap-2">
+                            1. Material Setup
+                            <!-- Tooltip wrapper -->
+                            <span class="group relative cursor-help text-slate-500 hover:text-slate-300 text-xs">
+                                ⓘ
+                                <span class="hidden group-hover:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-56 p-2 bg-slate-950 text-slate-200 text-[10px] rounded shadow-lg z-50 font-normal leading-normal">
+                                    Define physical attributes of the starting block and recovered scrap materials.
+                                </span>
+                            </span>
+                        </h2>
+                        
+                        <div class="flex items-center gap-2 bg-slate-900 px-2 py-1 rounded border border-slate-700">
+                            <label class="text-xs text-slate-400 cursor-pointer" for="calc-mode-select">Method:</label>
+                            <select id="calc-mode-select" onchange="toggleCalcMode()" class="bg-transparent text-xs text-slate-200 outline-none cursor-pointer">
+                                <option value="dynamic" class="bg-slate-900">Dynamic (Dimensions)</option>
+                                <option value="manual" class="bg-slate-900">Manual Weight Override</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Mode Inputs -->
+                    <div id="dynamic-material-inputs" class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Length (mm)</label>
+                            <input type="number" id="mat-length" value="150.000" step="0.001" min="0.001" oninput="calculate()" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Width (mm)</label>
+                            <input type="number" id="mat-width" value="120.000" step="0.001" min="0.001" oninput="calculate()" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Height (mm)</label>
+                            <input type="number" id="mat-height" value="80.000" step="0.001" min="0.001" oninput="calculate()" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1 flex items-center gap-1">
+                                Density (g/cm³)
+                                <span class="group relative cursor-help text-slate-500 text-[10px]">
+                                    [?]
+                                    <span class="hidden group-hover:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-slate-950 text-slate-200 text-[10px] rounded shadow-lg z-50">
+                                        Aluminum is typically 2.700 g/cm³ (6061 alloy).
+                                    </span>
+                                </span>
+                            </label>
+                            <input type="number" id="mat-density" value="2.700" step="0.001" min="0.001" oninput="calculate()" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <!-- Manual Weight Mode -->
+                    <div id="manual-material-inputs" class="hidden grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Raw Block Weight (kg)</label>
+                            <input type="number" id="manual-raw-weight" value="3.888" step="0.001" min="0.000" oninput="calculate()" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div></div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-700/50">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1 flex items-center gap-1">
+                                Finished Part Weight (kg)
+                                <span class="group relative cursor-help text-slate-500 text-[10px]">
+                                    [?]
+                                    <span class="hidden group-hover:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-slate-950 text-slate-200 text-[10px] rounded shadow-lg z-50">
+                                        Used to calculate the volume of material shaved off as recyclable chips.
+                                    </span>
+                                </span>
+                            </label>
+                            <input type="number" id="finished-weight" value="1.800" step="0.001" min="0.000" oninput="calculate()" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Raw Material Price (€/kg)</label>
+                            <input type="number" id="mat-cost-per-kg" value="6.500" step="0.001" min="0.000" oninput="calculate()" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1 flex items-center gap-1">
+                                Scrap Value (€/kg)
+                                <span class="group relative cursor-help text-slate-500 text-[10px]">
+                                    [?]
+                                    <span class="hidden group-hover:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-slate-950 text-slate-200 text-[10px] rounded shadow-lg z-50">
+                                        Credit received for selling machined aluminum scrap chips back to the refinery.
+                                    </span>
+                                </span>
+                            </label>
+                            <input type="number" id="scrap-value-per-kg" value="1.200" step="0.001" min="0.000" oninput="calculate()" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2. Setup and Programming -->
+                <section class="bg-slate-800 rounded-xl p-5 border border-slate-700/50 shadow-lg">
+                    <h2 class="text-sm font-semibold text-blue-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                        2. Setup & Programming (NRE)
+                        <span class="group relative cursor-help text-slate-500 hover:text-slate-300 text-xs">
+                            ⓘ
+                            <span class="hidden group-hover:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-56 p-2 bg-slate-950 text-slate-200 text-[10px] rounded shadow-lg z-50 font-normal leading-normal">
+                                Amortized setup costs. If batch size is larger, NRE cost-per-part decreases significantly.
+                            </span>
+                        </span>
+                    </h2>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Programming (hrs)</label>
+                            <input type="number" id="setup-programming-time" value="4.000" step="0.001" min="0.000" oninput="calculate()" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Setup (hrs)</label>
+                            <input type="number" id="setup-machine-time" value="2.000" step="0.001" min="0.000" oninput="calculate()" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Labor Rate (€/hr)</label>
+                            <input type="number" id="setup-labor-rate" value="65.000" step="0.001" min="0.000" oninput="calculate()" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Batch Size (parts)</label>
+                            <input type="number" id="setup-batch-size" value="10" min="1" step="1" oninput="calculate()" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 3. Machining & Processes -->
+                <section class="bg-slate-800 rounded-xl p-5 border border-slate-700/50 shadow-lg">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
+                        <h2 class="text-sm font-semibold text-blue-400 uppercase tracking-wider flex items-center gap-2">
+                            3. Machining & Cycle Time
+                            <span class="group relative cursor-help text-slate-500 hover:text-slate-300 text-xs">
+                                ⓘ
+                                <span class="hidden group-hover:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-56 p-2 bg-slate-950 text-slate-200 text-[10px] rounded shadow-lg z-50 font-normal leading-normal">
+                                    Set milling, profiling, and structural steps alongside the core machine run fee.
+                                </span>
+                            </span>
+                        </h2>
+                        
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-slate-400">Machine Fee (€/hr):</span>
+                            <input type="number" id="machine-hourly-rate" value="85.000" step="0.001" min="0.000" oninput="calculate()" class="w-24 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white text-center focus:border-blue-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Processes Table -->
+                    <div class="space-y-3 mb-4">
+                        <div class="text-xs font-medium text-slate-400 grid grid-cols-12 gap-2 px-1">
+                            <div class="col-span-8">Machining Process Name</div>
+                            <div class="col-span-3 text-right">Cycle Time (mins)</div>
+                            <div class="col-span-1"></div>
+                        </div>
+                        <div id="processes-container" class="space-y-2">
+                            <!-- Dynamic rows injected by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Add Custom Process -->
+                    <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700/30 flex flex-col sm:flex-row gap-2 items-end sm:items-center">
+                        <div class="flex-grow grid grid-cols-1 sm:grid-cols-3 gap-2 w-full">
+                            <input type="text" id="new-proc-name" placeholder="e.g., Pocketing" class="sm:col-span-2 bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white focus:border-blue-500 focus:outline-none">
+                            <input type="number" id="new-proc-time" placeholder="Mins" step="0.001" min="0" class="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <button type="button" onclick="addCustomProcess()" class="w-full sm:w-auto px-4 py-1.5 bg-blue-600 hover:bg-blue-500 transition text-white text-xs font-semibold rounded shrink-0">
+                            + Add Process
+                        </button>
+                    </div>
+
+                    <!-- Standard Hole Sub-Section -->
+                    <div class="mt-4 pt-4 border-t border-slate-700/50 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-900/40 p-3 rounded-lg">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1 flex items-center gap-1">
+                                Standard Holes (Quantity)
+                                <span class="group relative cursor-help text-slate-500 text-[10px]">
+                                    [?]
+                                    <span class="hidden group-hover:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-slate-950 text-slate-200 text-[10px] rounded shadow-lg z-50">
+                                        Multiplies times standard hole run rates below to calculate total drilling time.
+                                    </span>
+                                </span>
+                            </label>
+                            <input type="number" id="hole-qty" value="12" min="0" step="1" oninput="calculate()" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Time per Hole (seconds)</label>
+                            <input type="number" id="hole-time-sec" value="25.000" step="0.001" min="0.000" oninput="calculate()" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 4. Tooling & Specialized Tools -->
+                <section class="bg-slate-800 rounded-xl p-5 border border-slate-700/50 shadow-lg space-y-5">
+                    <!-- Tooling Wear -->
+                    <div>
+                        <div class="flex justify-between items-center mb-3">
+                            <h2 class="text-sm font-semibold text-blue-400 uppercase tracking-wider flex items-center gap-2">
+                                4. Tooling Wear & Consumables
+                                <span class="group relative cursor-help text-slate-500 hover:text-slate-300 text-xs">
+                                    ⓘ
+                                    <span class="hidden group-hover:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-56 p-2 bg-slate-950 text-slate-200 text-[10px] rounded shadow-lg z-50 font-normal leading-normal">
+                                        Track standard tool degradation or calculate high-precision custom cavities separately.
+                                    </span>
+                                </span>
+                            </h2>
+                            
+                            <div class="flex items-center gap-2 bg-slate-900 px-2 py-1 rounded border border-slate-700">
+                                <label class="text-xs text-slate-400 cursor-pointer" for="wear-mode-select">Type:</label>
+                                <select id="wear-mode-select" onchange="toggleWearMode()" class="bg-transparent text-xs text-slate-200 outline-none cursor-pointer">
+                                    <option value="percentage" class="bg-slate-900">% of Machining Cost</option>
+                                    <option value="flat" class="bg-slate-900">Flat Rate per Part</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div id="wear-percentage-container">
+                                <label class="block text-xs text-slate-400 mb-1">Standard Tooling Wear (%)</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="range" id="tool-wear-percent" min="0" max="25" step="0.1" value="8.0" oninput="updateWearPercentText(this.value); calculate()" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                                    <span id="wear-percent-display" class="text-xs font-mono text-slate-300 w-12 text-right">8.000%</span>
+                                </div>
+                            </div>
+                            <div id="wear-flat-container" class="hidden">
+                                <label class="block text-xs text-slate-400 mb-1">Tooling Wear Flat Rate (€/part)</label>
+                                <input type="number" id="tool-wear-flat" value="5.000" step="0.001" min="0.000" oninput="calculate()" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none">
+                            </div>
+                            <div></div>
+                        </div>
+                    </div>
+
+                    <!-- Specialized Cavity Tools -->
+                    <div class="pt-4 border-t border-slate-700/50">
+                        <h3 class="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-3">Specialized Cavity Tools (Amortized Cost per Cycle)</h3>
+                        
+                        <div class="space-y-2 mb-4" id="specialized-tools-container">
+                            <!-- Injected dynamically by JS -->
+                        </div>
+
+                        <!-- Add Custom Cavity Tool -->
+                        <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700/30 flex flex-col sm:flex-row gap-2 items-end sm:items-center">
+                            <div class="flex-grow grid grid-cols-1 sm:grid-cols-3 gap-2 w-full">
+                                <input type="text" id="new-tool-name" placeholder="e.g., Sun T-11A Tool" class="sm:col-span-2 bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white focus:border-blue-500 focus:outline-none">
+                                <input type="number" id="new-tool-cost" placeholder="Cost (€)" min="0" step="0.001" class="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white focus:border-blue-500 focus:outline-none">
+                            </div>
+                            <button type="button" onclick="addCustomTool()" class="w-full sm:w-auto px-4 py-1.5 bg-blue-600 hover:bg-blue-500 transition text-white text-xs font-semibold rounded shrink-0">
+                                + Add Tool
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 5. Dynamic Post-Machining Operations -->
+                <section class="bg-slate-800 rounded-xl p-5 border border-slate-700/50 shadow-lg space-y-4">
+                    <h2 class="text-sm font-semibold text-blue-400 uppercase tracking-wider flex items-center gap-2">
+                        5. Post-Machining Operations
+                        <span class="group relative cursor-help text-slate-500 hover:text-slate-300 text-xs">
+                            ⓘ
+                            <span class="hidden group-hover:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-56 p-2 bg-slate-950 text-slate-200 text-[10px] rounded shadow-lg z-50 font-normal leading-normal">
+                                Fully dynamic list of deburring, coating, and cleaning procedures. Choose from Time-based, Weight-based, or Flat-rate formulas.
+                            </span>
+                        </span>
+                    </h2>
+
+                    <!-- Dynamic Post-Machining Table -->
+                    <div class="space-y-3 mb-4">
+                        <div class="text-xs font-medium text-slate-400 grid grid-cols-12 gap-2 px-1">
+                            <div class="col-span-4">Operation Name</div>
+                            <div class="col-span-3">Calc Type</div>
+                            <div class="col-span-4 text-right">Metrics (Time / Cost / Rate)</div>
+                            <div class="col-span-1"></div>
+                        </div>
+                        <div id="post-processes-container" class="space-y-2">
+                            <!-- Dynamic rows injected by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Add Custom Post-Machining Process -->
+                    <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700/30 space-y-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <input type="text" id="new-post-name" placeholder="e.g., Anodizing Type III" class="sm:col-span-2 bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white focus:border-blue-500 focus:outline-none">
+                            <select id="new-post-type" onchange="toggleNewPostFormFields()" class="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-200 focus:border-blue-500 focus:outline-none">
+                                <option value="flat">Flat-rate (€/part)</option>
+                                <option value="time">Time-based (Time & Labor)</option>
+                                <option value="weight">Weight-based (€/kg Finished)</option>
+                            </select>
+                        </div>
+
+                        <!-- Changing Form inputs based on type -->
+                        <div id="new-post-metrics" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <!-- Fields injected dynamically by JS based on type selection -->
+                        </div>
+
+                        <div class="text-right">
+                            <button type="button" onclick="addCustomPostProcess()" class="w-full sm:w-auto px-4 py-1.5 bg-blue-600 hover:bg-blue-500 transition text-white text-xs font-semibold rounded">
+                                + Add Finishing Step
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- Right Panel (Calculations Output) -->
+            <div class="lg:col-span-5 lg:sticky lg:top-24 space-y-6">
+                
+                <div class="bg-slate-800 rounded-xl border border-blue-500/30 overflow-hidden shadow-2xl">
+                    <!-- Live Per Part Cost -->
+                    <div class="bg-gradient-to-r from-slate-800 to-blue-900/40 p-6 border-b border-slate-700/50">
+                        <span class="text-xs text-blue-400 uppercase tracking-widest font-semibold block mb-1">DIRECT UNIT COST</span>
+                        <div class="flex items-baseline gap-2">
+                            <span class="text-5xl font-extrabold text-white tracking-tight" id="total-part-cost">€0.000</span>
+                            <span class="text-sm text-slate-400">/ part</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-2" id="batch-cost-statement">Total batch run cost: €0.000 (10 parts)</p>
+                    </div>
+
+                    <!-- Visual Breakdown Progress Bars -->
+                    <div class="p-6 space-y-4">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Estimated Cost Allocation</h3>
+                        
+                        <div class="space-y-4">
+                            <!-- Material -->
+                            <div class="flex flex-col gap-1">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-slate-300">Raw Material (Net)</span>
+                                    <span class="font-mono text-white" id="out-mat-cost">€0.000</span>
+                                </div>
+                                <div class="flex justify-between text-[11px] text-slate-400">
+                                    <span id="out-mat-weight-details">Weight: 0.000 kg</span>
+                                    <span id="out-scrap-recovery-details">Scrap Recovery: -€0.000</span>
+                                </div>
+                                <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden mt-1">
+                                    <div id="bar-material" class="bg-amber-500 h-full transition-all duration-300" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <!-- Setup -->
+                            <div class="flex flex-col gap-1">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-slate-300">Setup & Programming (Amortized)</span>
+                                    <span class="font-mono text-white" id="out-setup-cost">€0.000</span>
+                                </div>
+                                <div class="flex justify-between text-[11px] text-slate-400">
+                                    <span id="out-setup-time-details">NRE setup: 6.000 hrs</span>
+                                    <span>Distributed over batch size</span>
+                                </div>
+                                <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden mt-1">
+                                    <div id="bar-setup" class="bg-purple-500 h-full transition-all duration-300" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <!-- Machining -->
+                            <div class="flex flex-col gap-1">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-slate-300">CNC Machining Cycle Run</span>
+                                    <span class="font-mono text-white" id="out-machining-cost">€0.000</span>
+                                </div>
+                                <div class="flex justify-between text-[11px] text-slate-400">
+                                    <span id="out-machining-time-details">Total Cycle: 0.000 mins</span>
+                                    <span id="out-machining-rate-details">Rate: €85.000/hr</span>
+                                </div>
+                                <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden mt-1">
+                                    <div id="bar-machining" class="bg-blue-500 h-full transition-all duration-300" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <!-- Tooling -->
+                            <div class="flex flex-col gap-1">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-slate-300">Tooling & Special Cavities</span>
+                                    <span class="font-mono text-white" id="out-tooling-cost">€0.000</span>
+                                </div>
+                                <div class="flex justify-between text-[11px] text-slate-400">
+                                    <span id="out-tooling-details">Consumables budget</span>
+                                    <span>Wear amortization</span>
+                                </div>
+                                <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden mt-1">
+                                    <div id="bar-tooling" class="bg-emerald-500 h-full transition-all duration-300" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <!-- Post Machining -->
+                            <div class="flex flex-col gap-1">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-slate-300">Post-Machining Treatments</span>
+                                    <span class="font-mono text-white" id="out-post-cost">€0.000</span>
+                                </div>
+                                <div class="flex justify-between text-[11px] text-slate-400 font-mono">
+                                    <span>Anodize, debur, and custom dynamic steps</span>
+                                    <span>Total operations cost</span>
+                                </div>
+                                <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden mt-1">
+                                    <div id="bar-post" class="bg-teal-500 h-full transition-all duration-300" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Technical Summary Panel -->
+                        <div class="bg-slate-900 rounded-lg p-4 mt-6 border border-slate-700/50 space-y-2.5">
+                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Production Metadata</h4>
+                            <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                                <div class="flex justify-between border-b border-slate-800 pb-1.5">
+                                    <span class="text-slate-400">Raw Mass:</span>
+                                    <span class="font-medium text-slate-200" id="meta-raw-mass">0.000 kg</span>
+                                </div>
+                                <div class="flex justify-between border-b border-slate-800 pb-1.5">
+                                    <span class="text-slate-400">Finished Mass:</span>
+                                    <span class="font-medium text-slate-200" id="meta-fin-mass">0.000 kg</span>
+                                </div>
+                                <div class="flex justify-between border-b border-slate-800 pb-1.5">
+                                    <span class="text-slate-400">Material Loss:</span>
+                                    <span class="font-medium text-slate-200" id="meta-loss-percent">0.000%</span>
+                                </div>
+                                <div class="flex justify-between border-b border-slate-800 pb-1.5">
+                                    <span class="text-slate-400">Total Run Time:</span>
+                                    <span class="font-medium text-slate-200" id="meta-run-time">0.000 mins</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </main>
+
+    <footer class="mt-20 border-t border-slate-800 py-8 bg-slate-950/50 text-center text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto px-4">
+            <p>Direct calculations ignore indirect costs. Verify values against specific machinery and material supplier lists before final manufacturing estimates.</p>
+        </div>
+    </footer>
+
+    <!-- Costing and State JS Controller -->
+    <script src="app.js"></script>
+</body>
+</html>
