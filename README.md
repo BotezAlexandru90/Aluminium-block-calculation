@@ -1,4 +1,5 @@
 # Precision Aluminum Block Cost Estimator
+<img width="1309" height="1790" alt="image" src="https://github.com/user-attachments/assets/e2ab4e6a-3934-4527-8d74-39895e816b92" />
 
 A browser-based estimator for direct manufacturing costs of an aluminum block. It calculates material cost and scrap credit, setup amortization, machining time, tooling, post-machining operations, and total part and batch cost.
 
